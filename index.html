@@ -1724,6 +1724,40 @@
     });
   }
 
+  // Shopify Connect
+  async function connectShopify() {
+    const shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
+    if (!shop) return;
+
+    const token = getToken();
+    if (!token) return alert('Please login first');
+
+    try {
+      const res = await fetch(`/.netlify/functions/shopify-connect?shop=${shop}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Error: ' + (data.error || 'Could not connect'));
+      }
+    } catch (err) {
+      alert('Connection failed. Try again.');
+    }
+  }
+
+  // Make sidebar Shopify Connect clickable
+  document.addEventListener('DOMContentLoaded', () => {
+    const items = document.querySelectorAll('.sidebar-item');
+    items.forEach(item => {
+      if (item.textContent.includes('Shopify Connect')) {
+        item.onclick = connectShopify;
+        item.style.cursor = 'pointer';
+      }
+    });
+  });
+
   // Auto login if token exists
   window.addEventListener('load', () => {
     if (getToken()) loadDashboard();
