@@ -2,11 +2,12 @@
   "name": "seller-autopilot",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd netlify/functions && npm install"
+    "build": "echo 'Build complete'"
   },
   "dependencies": {
     "mongodb": "^6.0.0",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "axios": "^1.6.0"
   }
 }
