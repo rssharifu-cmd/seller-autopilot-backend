@@ -6,13 +6,29 @@
 <title>Seller Autopilot — AI Automations for Shopify Sellers</title>
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <script>
-  // Prevent auto popup immediately
   window.addEventListener('load', () => {
-    if (window.netlifyIdentity) {
-      window.netlifyIdentity.on('init', () => {
-        window.netlifyIdentity.close();
-      });
-    }
+    if (!window.netlifyIdentity) return;
+
+    // When user logs in via Google
+    window.netlifyIdentity.on('login', (user) => {
+      window.netlifyIdentity.close();
+      localStorage.setItem('sa_token', user.token.access_token);
+      localStorage.setItem('sa_email', user.email);
+      localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
+      window.location.href = 'https://seller-autopilot-app.netlify.app/#dashboard';
+      window.location.reload();
+    });
+
+    // Prevent auto popup — only show when button clicked
+    window.netlifyIdentity.on('init', (user) => {
+      if (user) {
+        // Already logged in via Netlify Identity
+        localStorage.setItem('sa_token', user.token.access_token);
+        localStorage.setItem('sa_email', user.email);
+        localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
+      }
+      window.netlifyIdentity.close();
+    });
   });
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@300;400;500;600&display=swap" rel="stylesheet">
