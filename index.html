@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seller Autopilot — AI Automations for Shopify Sellers</title>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1589,6 +1590,12 @@
 
     <button class="btn-submit" onclick="handleSignup()">Create Account →</button>
 
+    <div class="divider">or</div>
+
+    <button class="btn-submit" style="background:white;color:#333;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:10px;" onclick="handleGoogleLogin()">
+      <img src="https://www.google.com/favicon.ico" width="18"> Continue with Google
+    </button>
+
     <div class="modal-footer">
       Already have an account? <a onclick="closeModal('signup');showModal('login')">Sign in</a>
     </div>
@@ -1613,6 +1620,12 @@
     </div>
 
     <button class="btn-submit" onclick="handleLogin()">Sign In →</button>
+
+    <div class="divider">or</div>
+
+    <button class="btn-submit" style="background:white;color:#333;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:10px;" onclick="handleGoogleLogin()">
+      <img src="https://www.google.com/favicon.ico" width="18"> Continue with Google
+    </button>
 
     <div class="modal-footer">
       No account yet? <a onclick="closeModal('login');showModal('signup')">Start free trial</a>
@@ -1724,7 +1737,23 @@
     });
   }
 
-  // Shopify Connect
+  // Google Login via Netlify Identity
+  function handleGoogleLogin() {
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.open('login');
+      window.netlifyIdentity.on('login', (user) => {
+        const token = user.token.access_token;
+        saveToken(token);
+        closeModal('signup');
+        closeModal('login');
+        loadDashboard();
+        showPage('dashboard');
+        window.netlifyIdentity.close();
+      });
+    } else {
+      alert('Google login loading... try again in a moment.');
+    }
+  }
   async function connectShopify() {
     const shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
     if (!shop) return;
