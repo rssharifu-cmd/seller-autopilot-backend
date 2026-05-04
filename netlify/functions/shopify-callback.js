@@ -47,6 +47,23 @@ exports.handler = async (event) => {
 
     await client.close();
 
+    // Register webhooks
+    const webhookUrl = 'https://seller-autopilot-app.netlify.app/webhooks/shopify';
+    const topics = ['orders/create', 'orders/cancelled', 'checkouts/create', 'inventory_levels/update'];
+
+    for (const topic of topics) {
+      try {
+        await axios.post(
+          `https://${shop}/admin/api/2024-01/webhooks.json`,
+          { webhook: { topic, address: webhookUrl, format: 'json' } },
+          { headers: { 'X-Shopify-Access-Token': accessToken } }
+        );
+        console.log(`✅ Webhook registered: ${topic}`);
+      } catch (e) {
+        console.log(`Webhook ${topic} may already exist`);
+      }
+    }
+
     // Redirect to dashboard
     return {
       statusCode: 302,
