@@ -1775,15 +1775,44 @@
     }
   }
 
-  // Make sidebar Shopify Connect clickable
-  document.addEventListener('DOMContentLoaded', () => {
-    const items = document.querySelectorAll('.sidebar-item');
-    items.forEach(item => {
-      if (item.textContent.includes('Shopify Connect')) {
-        item.onclick = connectShopify;
-        item.style.cursor = 'pointer';
-      }
+  // Prevent Netlify Identity popup on load
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on('init', user => {
+      if (!user) window.netlifyIdentity.close();
     });
+  }
+
+  // All sidebar buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+      item.style.cursor = 'pointer';
+      item.addEventListener('click', () => {
+        const text = item.textContent.trim();
+        if (text.includes('Shopify Connect')) {
+          connectShopify();
+        } else if (text.includes('Billing')) {
+          alert('💳 Billing\n\nPlan: Pro Trial\nStatus: 14 days free\n\nStripe payment coming soon!');
+        } else if (text.includes('Email History')) {
+          alert('📬 Email History\n\nShowing emails sent by your automations.\nComing soon!');
+        } else if (text.includes('Analytics')) {
+          alert('📈 Analytics\n\nDetailed stats coming soon!');
+        } else if (text.includes('Preferences')) {
+          alert('⚙️ Preferences\n\nCustomization options coming soon!');
+        }
+      });
+    });
+
+    // Logout on avatar click
+    const avatar = document.querySelector('.user-avatar');
+    if (avatar) {
+      avatar.title = 'Click to logout';
+      avatar.addEventListener('click', () => {
+        if (confirm('Logout from Seller Autopilot?')) {
+          clearToken();
+          showPage('landing');
+        }
+      });
+    }
   });
 
   // Auto login if token exists - stay logged in
