@@ -1762,24 +1762,10 @@
     localStorage.removeItem('sa_token_time');
   }
 
-  // Google Login via Netlify Identity
+  // Google Login via Netlify Identity direct URL
   function handleGoogleLogin() {
-    if (window.netlifyIdentity) {
-      window.netlifyIdentity.open('login');
-      window.netlifyIdentity.on('login', (user) => {
-        const token = user.token.access_token;
-        saveToken(token);
-        localStorage.setItem('sa_email', user.email);
-        localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
-        window.netlifyIdentity.close();
-        closeModal('signup');
-        closeModal('login');
-        loadDashboard();
-        showPage('dashboard');
-      });
-    } else {
-      alert('Loading Google login... please try again.');
-    }
+    const siteUrl = 'https://seller-autopilot-app.netlify.app';
+    window.location.href = `${siteUrl}/.netlify/identity/authorize?provider=google&redirect_to=${siteUrl}`;
   }
   async function connectShopify() {
     const shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
