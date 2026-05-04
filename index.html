@@ -1678,6 +1678,8 @@
       const data = await res.json();
       if (data.error) return alert(data.error);
       saveToken(data.token);
+      localStorage.setItem('sa_email', email);
+      localStorage.setItem('sa_name', data.user.name);
       closeModal('signup');
       loadDashboard();
       showPage('dashboard');
@@ -1699,6 +1701,8 @@
       const data = await res.json();
       if (data.error) return alert(data.error);
       saveToken(data.token);
+      localStorage.setItem('sa_email', email);
+      localStorage.setItem('sa_name', data.user.name || email);
       closeModal('login');
       loadDashboard();
       showPage('dashboard');
@@ -1800,18 +1804,66 @@
       });
     });
 
-    // Logout on avatar click
+    // Profile dropdown on avatar click
     const avatar = document.querySelector('.user-avatar');
     if (avatar) {
-      avatar.title = 'Click to logout';
-      avatar.addEventListener('click', () => {
-        if (confirm('Logout from Seller Autopilot?')) {
-          clearToken();
-          showPage('landing');
-        }
+      avatar.style.cursor = 'pointer';
+      avatar.style.position = 'relative';
+
+      // Create dropdown
+      const dropdown = document.createElement('div');
+      dropdown.id = 'profile-dropdown';
+      dropdown.style.cssText = `
+        position: absolute;
+        top: 44px;
+        right: 0;
+        background: #1a1a26;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        padding: 16px;
+        min-width: 220px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        display: none;
+        z-index: 1000;
+      `;
+
+      const email = localStorage.getItem('sa_email') || 'user@example.com';
+      const name = localStorage.getItem('sa_name') || 'User';
+
+      dropdown.innerHTML = `
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px;">${name}</div>
+        <div style="color:#8888aa;font-size:13px;margin-bottom:16px;">${email}</div>
+        <div style="background:rgba(124,92,252,0.1);border:1px solid rgba(124,92,252,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#a78bfa;margin-bottom:16px;">
+          ✨ Pro Trial — 14 days free
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;">
+          <div onclick="handleLogout()" style="color:#ef4444;font-size:14px;cursor:pointer;padding:4px 0;">
+            🚪 Sign out
+          </div>
+        </div>
+      `;
+
+      avatar.appendChild(dropdown);
+
+      avatar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const d = document.getElementById('profile-dropdown');
+        d.style.display = d.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.addEventListener('click', () => {
+        const d = document.getElementById('profile-dropdown');
+        if (d) d.style.display = 'none';
       });
     }
   });
+
+  function handleLogout() {
+    clearToken();
+    localStorage.removeItem('sa_email');
+    localStorage.removeItem('sa_name');
+    showPage('landing');
+  }
 
   // Auto login if token exists - stay logged in
   window.addEventListener('load', () => {
