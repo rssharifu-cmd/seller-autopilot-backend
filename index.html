@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seller Autopilot — AI Automations for Shopify Sellers</title>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script>
+  // Prevent auto popup immediately
+  window.addEventListener('load', () => {
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on('init', () => {
+        window.netlifyIdentity.close();
+      });
+    }
+  });
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1751,9 +1762,24 @@
     localStorage.removeItem('sa_token_time');
   }
 
-  // Google Login — coming soon message
+  // Google Login via Netlify Identity
   function handleGoogleLogin() {
-    alert('Google login coming soon! Please use email/password for now.');
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.open('login');
+      window.netlifyIdentity.on('login', (user) => {
+        const token = user.token.access_token;
+        saveToken(token);
+        localStorage.setItem('sa_email', user.email);
+        localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
+        window.netlifyIdentity.close();
+        closeModal('signup');
+        closeModal('login');
+        loadDashboard();
+        showPage('dashboard');
+      });
+    } else {
+      alert('Loading Google login... please try again.');
+    }
   }
   async function connectShopify() {
     const shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
