@@ -1,13 +1,1916 @@
-{
-  "name": "seller-autopilot",
-  "version": "1.0.0",
-  "scripts": {
-    "build": "echo 'Build complete'"
-  },
-  "dependencies": {
-    "mongodb": "^6.0.0",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "axios": "^1.6.0"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Autopilot — AI Automations for Shopify Sellers</title>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    if (!window.netlifyIdentity) return;
+
+    // When user logs in via Google
+    window.netlifyIdentity.on('login', (user) => {
+      window.netlifyIdentity.close();
+      localStorage.setItem('sa_token', user.token.access_token);
+      localStorage.setItem('sa_email', user.email);
+      localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
+      window.location.href = 'https://seller-autopilot-app.netlify.app/#dashboard';
+      window.location.reload();
+    });
+
+    // Prevent auto popup — only show when button clicked
+    window.netlifyIdentity.on('init', (user) => {
+      if (user) {
+        // Already logged in via Netlify Identity
+        localStorage.setItem('sa_token', user.token.access_token);
+        localStorage.setItem('sa_email', user.email);
+        localStorage.setItem('sa_name', user.user_metadata?.full_name || user.email);
+      }
+      window.netlifyIdentity.close();
+    });
+  });
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c5cfc;
+    --accent2: #fc5c7d;
+    --accent-glow: rgba(124,92,252,0.3);
+    --text: #f0f0f8;
+    --text-muted: #8888aa;
+    --green: #22c55e;
+    --yellow: #f59e0b;
   }
-}
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Satoshi', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 48px;
+    background: rgba(10,10,15,0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+    cursor: pointer;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  .btn-nav {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Satoshi', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-nav:hover {
+    background: #6a4de8;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px var(--accent-glow);
+  }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 24px 80px;
+    position: relative;
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(124,92,252,0.15) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(124,92,252,0.1);
+    border: 1px solid rgba(124,92,252,0.3);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: #a78bfa;
+    font-weight: 500;
+    margin-bottom: 32px;
+    animation: fadeInDown 0.6s ease;
+  }
+
+  .badge-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  h1 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 700;
+    line-height: 1.0;
+    letter-spacing: -3px;
+    margin-bottom: 24px;
+    animation: fadeInUp 0.7s ease 0.1s both;
+  }
+
+  h1 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-sub {
+    font-size: 20px;
+    color: var(--text-muted);
+    max-width: 560px;
+    line-height: 1.6;
+    margin-bottom: 48px;
+    font-weight: 400;
+    animation: fadeInUp 0.7s ease 0.2s both;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    animation: fadeInUp 0.7s ease 0.3s both;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #5a3fd6);
+    color: white;
+    border: none;
+    padding: 16px 36px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Satoshi', sans-serif;
+    transition: all 0.2s;
+    box-shadow: 0 0 40px var(--accent-glow);
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px var(--accent-glow);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 16px 36px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Satoshi', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover {
+    border-color: rgba(255,255,255,0.2);
+    color: var(--text);
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 48px;
+    margin-top: 72px;
+    animation: fadeInUp 0.7s ease 0.4s both;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* AUTOMATIONS SECTION */
+  .section {
+    padding: 100px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 700;
+    letter-spacing: -2px;
+    margin-bottom: 16px;
+  }
+
+  .section-sub {
+    color: var(--text-muted);
+    font-size: 18px;
+    max-width: 500px;
+    line-height: 1.6;
+    margin-bottom: 64px;
+  }
+
+  /* AUTOMATION CARDS */
+  .automations-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .auto-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .auto-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .auto-card:hover {
+    border-color: rgba(124,92,252,0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .auto-card:hover::before { opacity: 1; }
+
+  .auto-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+
+  .auto-card h3 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+
+  .auto-card p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .auto-tag {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 100px;
+  }
+
+  /* PRICING */
+  .pricing-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 0;
+  }
+
+  .pricing-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px;
+    position: relative;
+    transition: all 0.3s;
+  }
+
+  .pricing-card.featured {
+    background: linear-gradient(135deg, rgba(124,92,252,0.15), rgba(252,92,125,0.08));
+    border-color: rgba(124,92,252,0.4);
+    transform: scale(1.03);
+  }
+
+  .featured-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 16px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  .plan-name {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .plan-price {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -2px;
+    margin: 16px 0 4px;
+  }
+
+  .plan-price sup {
+    font-size: 24px;
+    vertical-align: super;
+    letter-spacing: 0;
+  }
+
+  .plan-period {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+
+  .plan-features {
+    list-style: none;
+    margin-bottom: 32px;
+  }
+
+  .plan-features li {
+    font-size: 14px;
+    color: var(--text-muted);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .plan-features li:last-child { border-bottom: none; }
+
+  .check { color: var(--green); font-size: 16px; }
+  .cross { color: #ef4444; font-size: 16px; }
+
+  .btn-plan {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Satoshi', sans-serif;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .btn-plan-primary {
+    background: linear-gradient(135deg, var(--accent), #5a3fd6);
+    color: white;
+    box-shadow: 0 8px 24px var(--accent-glow);
+  }
+
+  .btn-plan-primary:hover { transform: translateY(-2px); }
+
+  .btn-plan-secondary {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border) !important;
+  }
+
+  .btn-plan-secondary:hover {
+    color: var(--text);
+    border-color: rgba(255,255,255,0.2) !important;
+  }
+
+  /* DASHBOARD PREVIEW */
+  .dashboard-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-top: 64px;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.5);
+  }
+
+  .dashboard-bar {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .db-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+  }
+
+  .db-inner {
+    padding: 28px;
+  }
+
+  .db-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+
+  .db-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  .db-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .metric-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .metric-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+
+  .metric-change {
+    font-size: 12px;
+    margin-top: 4px;
+    color: var(--green);
+  }
+
+  .db-automations {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .db-auto-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .db-auto-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .db-auto-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .db-auto-name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .db-auto-runs {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .toggle {
+    width: 44px; height: 24px;
+    border-radius: 100px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .toggle.on { background: var(--accent); }
+  .toggle.off { background: var(--surface2); border: 1px solid var(--border); }
+
+  .toggle-dot {
+    position: absolute;
+    top: 3px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .toggle.on .toggle-dot { left: 23px; }
+  .toggle.off .toggle-dot { left: 3px; }
+
+  /* SIGNUP MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 48px;
+    width: 100%;
+    max-width: 440px;
+    position: relative;
+    transform: scale(0.95) translateY(20px);
+    transition: transform 0.3s;
+  }
+
+  .modal-overlay.active .modal {
+    transform: scale(1) translateY(0);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    width: 32px; height: 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 18px;
+    transition: all 0.2s;
+  }
+
+  .modal-close:hover { color: var(--text); }
+
+  .modal-logo {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+
+  .modal h2 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+
+  .modal-sub {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .form-group input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: 'Satoshi', sans-serif;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,92,252,0.1);
+  }
+
+  .form-group input::placeholder { color: var(--text-muted); opacity: 0.5; }
+
+  .btn-submit {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), #5a3fd6);
+    color: white;
+    border: none;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Satoshi', sans-serif;
+    margin-top: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 8px 24px var(--accent-glow);
+  }
+
+  .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px var(--accent-glow);
+  }
+
+  .modal-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .modal-footer a {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* DASHBOARD PAGE */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .dashboard-page {
+    min-height: 100vh;
+    background: var(--bg);
+  }
+
+  .dash-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dash-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .user-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .dash-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  .dash-sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-item:hover { background: var(--surface2); color: var(--text); }
+  .sidebar-item.active { background: rgba(124,92,252,0.15); color: var(--accent); }
+
+  .sidebar-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 16px 16px 8px;
+    opacity: 0.5;
+  }
+
+  .dash-main {
+    padding: 32px;
+  }
+
+  .dash-main-header {
+    margin-bottom: 32px;
+  }
+
+  .dash-main-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+
+  .dash-main-sub {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .metric-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+
+  .metric-box-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .metric-box-value {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+
+  .metric-box-change {
+    font-size: 12px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .up { color: var(--green); }
+  .down { color: #ef4444; }
+
+  .auto-section-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: -0.5px;
+  }
+
+  .auto-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .auto-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.2s;
+  }
+
+  .auto-row:hover { border-color: rgba(124,92,252,0.2); }
+
+  .auto-row-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .auto-row-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  .auto-row-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .auto-row-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .auto-row-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .auto-runs {
+    text-align: right;
+  }
+
+  .auto-runs-num {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .auto-runs-label {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* SHOPIFY CONNECT */
+  .connect-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 48px;
+    max-width: 540px;
+    margin: 60px auto;
+    text-align: center;
+  }
+
+  .connect-icon {
+    width: 72px; height: 72px;
+    background: rgba(149,191,71,0.1);
+    border: 1px solid rgba(149,191,71,0.3);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin: 0 auto 24px;
+  }
+
+  .connect-card h2 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 12px;
+  }
+
+  .connect-card p {
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  .store-input-group {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .store-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: 'Satoshi', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .store-input:focus {
+    border-color: var(--accent);
+  }
+
+  .store-suffix {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    nav { padding: 16px 20px; }
+    .nav-links { display: none; }
+    .automations-grid { grid-template-columns: 1fr; }
+    .pricing-cards { grid-template-columns: 1fr; }
+    .pricing-card.featured { transform: none; }
+    .metrics-row { grid-template-columns: repeat(2, 1fr); }
+    .section { padding: 60px 20px; }
+    .dash-layout { grid-template-columns: 1fr; }
+    .dash-sidebar { display: none; }
+    footer { flex-direction: column; gap: 16px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LANDING PAGE -->
+<div id="landing" class="page active">
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">Seller Autopilot</div>
+    <div class="nav-links">
+      <a onclick="scrollToSection('automations')">Automations</a>
+      <a onclick="scrollToSection('pricing')">Pricing</a>
+      <a onclick="scrollToSection('demo')">Demo</a>
+      <button class="btn-nav" onclick="showModal('signup')">Start Free Trial</button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+
+    <div class="badge">
+      <div class="badge-dot"></div>
+      AI-powered automation for Shopify sellers
+    </div>
+
+    <h1>Your store runs<br><span>itself.</span></h1>
+
+    <p class="hero-sub">Plug in your Shopify store. 10 AI automations go live instantly — emails, alerts, reports, reviews. Zero code, zero effort.</p>
+
+    <div class="hero-cta">
+      <button class="btn-primary" onclick="showModal('signup')">Start Free — 14 Days</button>
+      <button class="btn-secondary" onclick="showPage('dashboard')">See Dashboard →</button>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">10x</div>
+        <div class="stat-label">Faster response time</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">$0</div>
+        <div class="stat-label">Setup cost</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">5min</div>
+        <div class="stat-label">To go live</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUTOMATIONS -->
+  <section class="section" id="automations">
+    <div class="section-label">What's included</div>
+    <h2 class="section-title">10 automations,<br>active from day one.</h2>
+    <p class="section-sub">Every automation runs on AI. No templates. No copy-paste. Real, personalized actions.</p>
+
+    <div class="automations-grid">
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(124,92,252,0.1);">📬</div>
+        <h3>Welcome Email</h3>
+        <p>AI writes a personalized thank-you email the moment a new order comes in.</p>
+        <span class="auto-tag" style="background:rgba(124,92,252,0.1);color:#a78bfa;">Orders</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(239,68,68,0.1);">🔔</div>
+        <h3>Low Stock Alert</h3>
+        <p>Instant notification when any product drops below your set threshold.</p>
+        <span class="auto-tag" style="background:rgba(239,68,68,0.1);color:#f87171;">Inventory</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(245,158,11,0.1);">🛒</div>
+        <h3>Abandoned Cart Recovery</h3>
+        <p>AI-written follow-up sent 1 hour after a cart is abandoned. Recovers lost sales.</p>
+        <span class="auto-tag" style="background:rgba(245,158,11,0.1);color:#fbbf24;">Revenue</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(34,197,94,0.1);">⭐</div>
+        <h3>Review Reply Draft</h3>
+        <p>Every new review gets an AI-drafted reply, saved to your Google Sheet.</p>
+        <span class="auto-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;">Reviews</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(59,130,246,0.1);">📊</div>
+        <h3>Weekly Sales Report</h3>
+        <p>Auto-generated PDF report every Monday with revenue, top products, trends.</p>
+        <span class="auto-tag" style="background:rgba(59,130,246,0.1);color:#60a5fa;">Reports</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(252,92,125,0.1);">💸</div>
+        <h3>Refund Auto-Reply</h3>
+        <p>Instant acknowledgment sent to customers who request a refund. Professional tone.</p>
+        <span class="auto-tag" style="background:rgba(252,92,125,0.1);color:#fb7185;">Support</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(124,92,252,0.1);">👤</div>
+        <h3>New Customer CRM Log</h3>
+        <p>Every new customer auto-added to your Google Sheet with full order details.</p>
+        <span class="auto-tag" style="background:rgba(124,92,252,0.1);color:#a78bfa;">CRM</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(245,158,11,0.1);">📦</div>
+        <h3>Out-of-Stock Waitlist</h3>
+        <p>Automatically email waiting customers when an out-of-stock product is back.</p>
+        <span class="auto-tag" style="background:rgba(245,158,11,0.1);color:#fbbf24;">Inventory</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(34,197,94,0.1);">📱</div>
+        <h3>Daily Revenue Summary</h3>
+        <p>Get your daily revenue, orders, and top product sent to Telegram every evening.</p>
+        <span class="auto-tag" style="background:rgba(34,197,94,0.1);color:#4ade80;">Reports</span>
+      </div>
+      <div class="auto-card">
+        <div class="auto-icon" style="background:rgba(239,68,68,0.1);">🚨</div>
+        <h3>Negative Review Alert</h3>
+        <p>Immediate alert when a 1 or 2-star review lands. Respond before it goes viral.</p>
+        <span class="auto-tag" style="background:rgba(239,68,68,0.1);color:#f87171;">Reviews</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD PREVIEW -->
+  <section class="section" id="demo" style="padding-top:0;">
+    <div class="section-label">Live Preview</div>
+    <h2 class="section-title">Your control center.</h2>
+    <p class="section-sub">Toggle automations on/off. See how many times each ran. Full visibility.</p>
+
+    <div class="dashboard-preview">
+      <div class="dashboard-bar">
+        <div class="db-dot" style="background:#ef4444;"></div>
+        <div class="db-dot" style="background:#f59e0b;"></div>
+        <div class="db-dot" style="background:#22c55e;"></div>
+        <span style="color:var(--text-muted);font-size:13px;margin-left:12px;">Seller Autopilot — Dashboard</span>
+      </div>
+      <div class="db-inner">
+        <div class="db-header">
+          <div class="db-title">Good morning, Alex 👋</div>
+          <div style="font-size:13px;color:var(--text-muted);">Last 30 days</div>
+        </div>
+        <div class="db-metrics">
+          <div class="metric-card">
+            <div class="metric-label">Emails Sent</div>
+            <div class="metric-value" style="color:var(--accent);">1,284</div>
+            <div class="metric-change">↑ 12% vs last month</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Revenue Saved</div>
+            <div class="metric-value" style="color:var(--green);">$3.2k</div>
+            <div class="metric-change">Abandoned carts recovered</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Reviews Replied</div>
+            <div class="metric-value" style="color:var(--yellow);">47</div>
+            <div class="metric-change">Avg 4.2★ rating</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Automations Active</div>
+            <div class="metric-value">8/10</div>
+            <div class="metric-change" style="color:var(--text-muted);">2 paused</div>
+          </div>
+        </div>
+        <div class="db-automations">
+          <div class="db-auto-row">
+            <div class="db-auto-left">
+              <div class="db-auto-icon" style="background:rgba(124,92,252,0.1);">📬</div>
+              <div>
+                <div class="db-auto-name">Welcome Email</div>
+                <div class="db-auto-runs" style="color:var(--text-muted);font-size:12px;">486 runs this month</div>
+              </div>
+            </div>
+            <div class="toggle on"><div class="toggle-dot"></div></div>
+          </div>
+          <div class="db-auto-row">
+            <div class="db-auto-left">
+              <div class="db-auto-icon" style="background:rgba(245,158,11,0.1);">🛒</div>
+              <div>
+                <div class="db-auto-name">Abandoned Cart Recovery</div>
+                <div class="db-auto-runs" style="color:var(--text-muted);font-size:12px;">142 runs · $3,200 recovered</div>
+              </div>
+            </div>
+            <div class="toggle on"><div class="toggle-dot"></div></div>
+          </div>
+          <div class="db-auto-row">
+            <div class="db-auto-left">
+              <div class="db-auto-icon" style="background:rgba(239,68,68,0.1);">🚨</div>
+              <div>
+                <div class="db-auto-name">Negative Review Alert</div>
+                <div class="db-auto-runs" style="color:var(--text-muted);font-size:12px;">3 alerts sent this month</div>
+              </div>
+            </div>
+            <div class="toggle off"><div class="toggle-dot"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="section" id="pricing">
+    <div class="section-label">Simple pricing</div>
+    <h2 class="section-title">One price. Everything included.</h2>
+    <p class="section-sub">No setup fees. No per-automation charges. Cancel anytime.</p>
+
+    <div class="pricing-cards">
+      <div class="pricing-card">
+        <div class="plan-name">Starter</div>
+        <div style="color:var(--text-muted);font-size:14px;">For new sellers</div>
+        <div class="plan-price"><sup>$</sup>9</div>
+        <div class="plan-period">per month</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> 3 automations active</li>
+          <li><span class="check">✓</span> 500 runs/month</li>
+          <li><span class="check">✓</span> Email support</li>
+          <li><span class="cross">✗</span> Telegram alerts</li>
+          <li><span class="cross">✗</span> Weekly reports</li>
+        </ul>
+        <button class="btn-plan btn-plan-secondary" onclick="showModal('signup')">Get Started</button>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="featured-badge">Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div style="color:var(--text-muted);font-size:14px;">For growing stores</div>
+        <div class="plan-price"><sup>$</sup>19</div>
+        <div class="plan-period">per month</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> All 10 automations</li>
+          <li><span class="check">✓</span> Unlimited runs</li>
+          <li><span class="check">✓</span> Telegram + Email alerts</li>
+          <li><span class="check">✓</span> Weekly PDF reports</li>
+          <li><span class="check">✓</span> Priority support</li>
+        </ul>
+        <button class="btn-plan btn-plan-primary" onclick="showModal('signup')">Start Free Trial</button>
+      </div>
+
+      <div class="pricing-card">
+        <div class="plan-name">Agency</div>
+        <div style="color:var(--text-muted);font-size:14px;">For multiple stores</div>
+        <div class="plan-price"><sup>$</sup>49</div>
+        <div class="plan-period">per month</div>
+        <ul class="plan-features">
+          <li><span class="check">✓</span> Up to 5 stores</li>
+          <li><span class="check">✓</span> All Pro features</li>
+          <li><span class="check">✓</span> Custom automations</li>
+          <li><span class="check">✓</span> White-label reports</li>
+          <li><span class="check">✓</span> Dedicated support</li>
+        </ul>
+        <button class="btn-plan btn-plan-secondary" onclick="showModal('signup')">Contact Us</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="logo">Seller Autopilot</div>
+    <div>© 2026 Seller Autopilot. All rights reserved.</div>
+    <div style="display:flex;gap:24px;">
+      <a href="#" style="color:var(--text-muted);text-decoration:none;">Privacy</a>
+      <a href="#" style="color:var(--text-muted);text-decoration:none;">Terms</a>
+      <a href="#" style="color:var(--text-muted);text-decoration:none;">Contact</a>
+    </div>
+  </footer>
+</div>
+
+<!-- DASHBOARD PAGE -->
+<div id="dashboard" class="page">
+  <div class="dashboard-page">
+    <div class="dash-nav">
+      <div class="logo">Seller Autopilot</div>
+      <div class="dash-nav-right">
+        <span style="font-size:13px;color:var(--text-muted);">mystore.myshopify.com</span>
+        <div class="user-avatar">A</div>
+        <button class="btn-secondary" style="font-size:13px;padding:8px 16px;" onclick="showPage('landing')">← Back</button>
+      </div>
+    </div>
+
+    <div class="dash-layout">
+      <div class="dash-sidebar">
+        <div class="sidebar-item active">📊 Dashboard</div>
+        <div class="sidebar-item">⚡ Automations</div>
+        <div class="sidebar-item">📬 Email History</div>
+        <div class="sidebar-item">📈 Analytics</div>
+        <div class="sidebar-section">Settings</div>
+        <div class="sidebar-item">🔗 Shopify Connect</div>
+        <div class="sidebar-item">💳 Billing</div>
+        <div class="sidebar-item">⚙️ Preferences</div>
+      </div>
+
+      <div class="dash-main">
+        <div class="dash-main-header">
+          <div class="dash-main-title">Dashboard</div>
+          <div class="dash-main-sub">Last updated: just now · All automations synced</div>
+        </div>
+
+        <div class="metrics-row">
+          <div class="metric-box">
+            <div class="metric-box-label">📬 Emails Sent</div>
+            <div class="metric-box-value">1,284</div>
+            <div class="metric-box-change up">↑ 12% this month</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-box-label">💰 Revenue Recovered</div>
+            <div class="metric-box-value" style="color:var(--green);">$3,240</div>
+            <div class="metric-box-change up">↑ Abandoned carts</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-box-label">⭐ Reviews Handled</div>
+            <div class="metric-box-value" style="color:var(--yellow);">47</div>
+            <div class="metric-box-change" style="color:var(--text-muted);">Avg 4.2★ rating</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-box-label">⚡ Active Automations</div>
+            <div class="metric-box-value">8<span style="font-size:18px;color:var(--text-muted);">/10</span></div>
+            <div class="metric-box-change" style="color:var(--text-muted);">2 paused</div>
+          </div>
+        </div>
+
+        <div class="auto-section-title">Your Automations</div>
+        <div class="auto-list">
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(124,92,252,0.1);">📬</div>
+              <div>
+                <div class="auto-row-name">Welcome Email</div>
+                <div class="auto-row-desc">Sends when new order placed</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">486</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(239,68,68,0.1);">🔔</div>
+              <div>
+                <div class="auto-row-name">Low Stock Alert</div>
+                <div class="auto-row-desc">Alert when stock &lt; threshold</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">23</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(245,158,11,0.1);">🛒</div>
+              <div>
+                <div class="auto-row-name">Abandoned Cart Recovery</div>
+                <div class="auto-row-desc">Follow-up after 1 hour</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">142</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(34,197,94,0.1);">⭐</div>
+              <div>
+                <div class="auto-row-name">Review Reply Draft</div>
+                <div class="auto-row-desc">AI-drafted reply to Google Sheet</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">47</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(59,130,246,0.1);">📊</div>
+              <div>
+                <div class="auto-row-name">Weekly Sales Report</div>
+                <div class="auto-row-desc">Every Monday, auto PDF</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">4</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(252,92,125,0.1);">💸</div>
+              <div>
+                <div class="auto-row-name">Refund Auto-Reply</div>
+                <div class="auto-row-desc">Instant acknowledgment</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">18</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(34,197,94,0.1);">📱</div>
+              <div>
+                <div class="auto-row-name">Daily Revenue Summary</div>
+                <div class="auto-row-desc">Telegram message every evening</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">30</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(124,92,252,0.1);">👤</div>
+              <div>
+                <div class="auto-row-name">New Customer CRM Log</div>
+                <div class="auto-row-desc">Auto-add to Google Sheets</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">321</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle on" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(239,68,68,0.1);">🚨</div>
+              <div>
+                <div class="auto-row-name">Negative Review Alert</div>
+                <div class="auto-row-desc">1-2 star review instant alert</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">3</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle off" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+          <div class="auto-row">
+            <div class="auto-row-left">
+              <div class="auto-row-icon" style="background:rgba(245,158,11,0.1);">📦</div>
+              <div>
+                <div class="auto-row-name">Out-of-Stock Waitlist</div>
+                <div class="auto-row-desc">Email waiting customers on restock</div>
+              </div>
+            </div>
+            <div class="auto-row-right">
+              <div class="auto-runs">
+                <div class="auto-runs-num">0</div>
+                <div class="auto-runs-label">runs</div>
+              </div>
+              <div class="toggle off" onclick="toggleSwitch(this)"><div class="toggle-dot"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SIGNUP MODAL -->
+<div class="modal-overlay" id="modal-signup">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal('signup')">✕</div>
+    <div class="modal-logo">Seller Autopilot</div>
+    <h2>Start your free trial</h2>
+    <p class="modal-sub">14 days free. No credit card required.</p>
+
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" placeholder="Alex Johnson">
+    </div>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" placeholder="alex@mystore.com">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" placeholder="Min. 8 characters">
+    </div>
+
+    <button class="btn-submit" onclick="handleSignup()">Create Account →</button>
+
+    <div class="divider">or</div>
+
+    <button class="btn-submit" style="background:white;color:#333;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:10px;" onclick="handleGoogleLogin()">
+      <img src="https://www.google.com/favicon.ico" width="18"> Continue with Google
+    </button>
+
+    <div class="modal-footer">
+      Already have an account? <a onclick="closeModal('signup');showModal('login')">Sign in</a>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal('login')">✕</div>
+    <div class="modal-logo">Seller Autopilot</div>
+    <h2>Welcome back</h2>
+    <p class="modal-sub">Sign in to your account.</p>
+
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" placeholder="alex@mystore.com">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" placeholder="Your password">
+    </div>
+
+    <button class="btn-submit" onclick="handleLogin()">Sign In →</button>
+
+    <div class="divider">or</div>
+
+    <button class="btn-submit" style="background:white;color:#333;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:10px;" onclick="handleGoogleLogin()">
+      <img src="https://www.google.com/favicon.ico" width="18"> Continue with Google
+    </button>
+
+    <div class="modal-footer">
+      No account yet? <a onclick="closeModal('login');showModal('signup')">Start free trial</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showModal(type) {
+    document.getElementById('modal-' + type).classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal(type) {
+    document.getElementById('modal-' + type).classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  function showPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(page).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function scrollToSection(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function toggleSwitch(el) {
+    el.classList.toggle('on');
+    el.classList.toggle('off');
+  }
+
+  // Save token
+  function saveToken(token) { localStorage.setItem('sa_token', token); }
+  function getToken() { return localStorage.getItem('sa_token'); }
+
+  async function handleSignup() {
+    const name = document.querySelector('#modal-signup input[type="text"]').value;
+    const email = document.querySelector('#modal-signup input[type="email"]').value;
+    const password = document.querySelector('#modal-signup input[type="password"]').value;
+
+    if (!name || !email || !password) return alert('Please fill all fields');
+
+    try {
+      const res = await fetch('/.netlify/functions/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (data.error) return alert(data.error);
+      saveToken(data.token);
+      localStorage.setItem('sa_email', email);
+      localStorage.setItem('sa_name', data.user.name);
+      closeModal('signup');
+      loadDashboard();
+      showPage('dashboard');
+    } catch (err) {
+      alert('Something went wrong. Try again.');
+    }
+  }
+
+  async function handleLogin() {
+    const email = document.querySelector('#modal-login input[type="email"]').value;
+    const password = document.querySelector('#modal-login input[type="password"]').value;
+
+    try {
+      const res = await fetch('/.netlify/functions/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.error) return alert(data.error);
+      saveToken(data.token);
+      localStorage.setItem('sa_email', email);
+      localStorage.setItem('sa_name', data.user.name || email);
+      closeModal('login');
+      loadDashboard();
+      showPage('dashboard');
+    } catch (err) {
+      alert('Something went wrong. Try again.');
+    }
+  }
+
+  async function loadDashboard() {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch('/.netlify/functions/dashboard', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.name) {
+        document.querySelector('.db-title').textContent = `Good morning, ${data.name} 👋`;
+      }
+    } catch (err) {
+      console.log('Dashboard load error:', err);
+    }
+  }
+
+  async function toggleSwitch(el, key) {
+    el.classList.toggle('on');
+    el.classList.toggle('off');
+    const isOn = el.classList.contains('on');
+    const token = getToken();
+    if (!token || !key) return;
+    await fetch('/.netlify/functions/toggle-automation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ key, value: isOn })
+    });
+  }
+
+  // Save token - persistent in localStorage
+  function saveToken(token) { 
+    localStorage.setItem('sa_token', token);
+    localStorage.setItem('sa_token_time', Date.now());
+  }
+  function getToken() { return localStorage.getItem('sa_token'); }
+  function clearToken() { 
+    localStorage.removeItem('sa_token');
+    localStorage.removeItem('sa_token_time');
+  }
+
+  // Google Login via Netlify Identity direct URL
+  function handleGoogleLogin() {
+    const siteUrl = 'https://seller-autopilot-app.netlify.app';
+    window.location.href = `${siteUrl}/.netlify/identity/authorize?provider=google&redirect_to=${siteUrl}`;
+  }
+  async function connectShopify() {
+    const shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
+    if (!shop) return;
+
+    const token = getToken();
+    if (!token) return alert('Please login first');
+
+    try {
+      const res = await fetch(`/.netlify/functions/shopify-connect?shop=${shop}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert('Error: ' + (data.error || 'Could not connect'));
+      }
+    } catch (err) {
+      alert('Connection failed. Try again.');
+    }
+  }
+
+  // Prevent Netlify Identity popup on load
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on('init', user => {
+      if (!user) window.netlifyIdentity.close();
+    });
+  }
+
+  // All sidebar buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+      item.style.cursor = 'pointer';
+      item.addEventListener('click', () => {
+        const text = item.textContent.trim();
+        if (text.includes('Shopify Connect')) {
+          connectShopify();
+        } else if (text.includes('Billing')) {
+          alert('💳 Billing\n\nPlan: Pro Trial\nStatus: 14 days free\n\nStripe payment coming soon!');
+        } else if (text.includes('Email History')) {
+          alert('📬 Email History\n\nShowing emails sent by your automations.\nComing soon!');
+        } else if (text.includes('Analytics')) {
+          alert('📈 Analytics\n\nDetailed stats coming soon!');
+        } else if (text.includes('Preferences')) {
+          alert('⚙️ Preferences\n\nCustomization options coming soon!');
+        }
+      });
+    });
+
+    // Profile dropdown on avatar click
+    const avatar = document.querySelector('.user-avatar');
+    if (avatar) {
+      avatar.style.cursor = 'pointer';
+      avatar.style.position = 'relative';
+
+      // Create dropdown
+      const dropdown = document.createElement('div');
+      dropdown.id = 'profile-dropdown';
+      dropdown.style.cssText = `
+        position: absolute;
+        top: 44px;
+        right: 0;
+        background: #1a1a26;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        padding: 16px;
+        min-width: 220px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        display: none;
+        z-index: 1000;
+      `;
+
+      const email = localStorage.getItem('sa_email') || 'user@example.com';
+      const name = localStorage.getItem('sa_name') || 'User';
+
+      dropdown.innerHTML = `
+        <div style="font-weight:600;font-size:15px;margin-bottom:4px;">${name}</div>
+        <div style="color:#8888aa;font-size:13px;margin-bottom:16px;">${email}</div>
+        <div style="background:rgba(124,92,252,0.1);border:1px solid rgba(124,92,252,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#a78bfa;margin-bottom:16px;">
+          ✨ Pro Trial — 14 days free
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;">
+          <div onclick="handleLogout()" style="color:#ef4444;font-size:14px;cursor:pointer;padding:4px 0;">
+            🚪 Sign out
+          </div>
+        </div>
+      `;
+
+      avatar.appendChild(dropdown);
+
+      avatar.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const d = document.getElementById('profile-dropdown');
+        d.style.display = d.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.addEventListener('click', () => {
+        const d = document.getElementById('profile-dropdown');
+        if (d) d.style.display = 'none';
+      });
+    }
+  });
+
+  function handleLogout() {
+    clearToken();
+    localStorage.removeItem('sa_email');
+    localStorage.removeItem('sa_name');
+    showPage('landing');
+  }
+
+  // Auto login if token exists - stay logged in
+  window.addEventListener('load', () => {
+    const token = getToken();
+    if (token) {
+      loadDashboard();
+      showPage('dashboard');
+    }
+  });
+
+  // Close modal on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    });
+  });
+</script>
+</body>
+</html>
