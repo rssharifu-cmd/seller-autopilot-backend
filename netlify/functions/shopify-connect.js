@@ -1,14 +1,16 @@
 const crypto = require('crypto');
 
+const REDIRECT_URI = 'https://seller-autopilot-app.netlify.app/.netlify/functions/shopify-callback';
+const SCOPES = 'read_orders,write_orders,read_inventory,read_products,read_customers';
+
 exports.handler = async (event) => {
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS'
       },
       body: ''
     };
@@ -21,47 +23,51 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Shop parameter required. Example: mystore.myshopify.com' })
+        body: JSON.stringify({ error: 'Shop parameter is required. Example: mystore.myshopify.com' })
       };
     }
 
-    // Clean and validate shop format
-    const cleanShop = shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const shopRegex = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
-    if (!shopRegex.test(cleanShop)) {
+    // Clean shop input
+    const cleanShop = shop.trim().toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+
+    // Validate myshopify.com format
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(cleanShop)) {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Invalid shop URL. Use format: yourstore.myshopify.com' })
+        body: JSON.stringify({ error: 'Invalid shop URL. Format: yourstore.myshopify.com' })
       };
     }
 
     const apiKey = process.env.SHOPIFY_API_KEY;
-    const redirectUri = process.env.SHOPIFY_REDIRECT_URI;
-
-    if (!apiKey || !redirectUri) {
-      console.error('Missing env vars: SHOPIFY_API_KEY or SHOPIFY_REDIRECT_URI');
+    if (!apiKey) {
+      console.error('SHOPIFY_API_KEY is not set');
       return {
         statusCode: 500,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ error: 'Server configuration error. Contact support.' })
+        body: JSON.stringify({ error: 'Server misconfiguration: missing API key.' })
       };
     }
 
-    // Generate secure state for CSRF protection
     const state = crypto.randomBytes(16).toString('hex');
-    const scopes = 'read_orders,write_orders,read_inventory,read_products,read_customers,write_script_tags';
 
-    const installUrl = `https://${cleanShop}/admin/oauth/authorize?client_id=${apiKey}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    // HARDCODED redirect URI — must match exactly what is in Shopify Partner Dashboard
+    const authUrl =
+      `https://${cleanShop}/admin/oauth/authorize` +
+      `?client_id=${apiKey}` +
+      `&scope=${encodeURIComponent(SCOPES)}` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&state=${state}`;
 
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+        'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ url: installUrl, state, shop: cleanShop })
+      body: JSON.stringify({ url: authUrl, state, shop: cleanShop })
     };
 
   } catch (err) {
