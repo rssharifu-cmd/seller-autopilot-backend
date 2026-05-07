@@ -1,154 +1,102 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const axios = require('axios');
-const jwt = require('jsonwebtoken');
+
+const REDIRECT_URI = 'https://seller-autopilot-app.netlify.app/.netlify/functions/shopify-callback';
+const DASHBOARD_URL = 'https://seller-autopilot-app.netlify.app';
 
 exports.handler = async (event) => {
   let client;
   try {
     const { shop, code, state } = event.queryStringParameters || {};
-    const DASHBOARD_URL = process.env.FRONTEND_URL ||
-      (event.headers && event.headers.host ? `https://${event.headers.host}` : 'https://seller-autopilot-app.netlify.app');
 
-    if (!shop || !code || !state) {
-      return {
-        statusCode: 302,
-        headers: { Location: `${DASHBOARD_URL}?shopify=error&reason=missing_params` },
-        body: ''
-      };
+    if (!shop || !code) {
+      console.error('Missing params:', { shop, code, state });
+      return redirect(`${DASHBOARD_URL}?shopify=error&reason=missing_params`);
     }
 
-    // Validate shop format
-    const shopRegex = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/;
-    if (!shopRegex.test(shop)) {
-      return {
-        statusCode: 302,
-        headers: { Location: `${DASHBOARD_URL}?shopify=error&reason=invalid_shop` },
-        body: ''
-      };
-    }
+    const cleanShop = shop.trim().toLowerCase();
 
-    // Exchange code for permanent access token
+    // 1. Exchange code for permanent access token
     const tokenRes = await axios.post(
-      `https://${shop}/admin/oauth/access_token`,
+      `https://${cleanShop}/admin/oauth/access_token`,
       {
         client_id: process.env.SHOPIFY_API_KEY,
         client_secret: process.env.SHOPIFY_API_SECRET,
         code
-      },
-      { headers: { 'Content-Type': 'application/json' } }
+      }
     );
 
     const accessToken = tokenRes.data.access_token;
     if (!accessToken) {
-      console.error('No access token returned from Shopify');
-      return {
-        statusCode: 302,
-        headers: { Location: `${DASHBOARD_URL}?shopify=error&reason=no_token` },
-        body: ''
-      };
+      console.error('Shopify returned no access token');
+      return redirect(`${DASHBOARD_URL}?shopify=error&reason=no_token`);
     }
 
-    // Get shop info from Shopify
+    // 2. Fetch shop info
     const shopRes = await axios.get(
-      `https://${shop}/admin/api/2024-01/shop.json`,
+      `https://${cleanShop}/admin/api/2024-01/shop.json`,
       { headers: { 'X-Shopify-Access-Token': accessToken } }
     );
     const shopInfo = shopRes.data.shop;
 
-    // Connect to MongoDB
+    // 3. Save to MongoDB
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI is not set');
+      return redirect(`${DASHBOARD_URL}?shopify=error&reason=db_config`);
+    }
+
     client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    const db = client.db('seller-autopilot');
-    const users = db.collection('users');
+    const users = client.db('seller-autopilot').collection('users');
 
-    // Try to decode state as JWT to find user
-    let userId = null;
-    try {
-      const decoded = jwt.verify(state, process.env.JWT_SECRET);
-      userId = decoded.id || decoded._id || decoded.userId;
-    } catch (e) {
-      console.log('State is not a JWT, using shop-based lookup');
-    }
+    // Upsert by shop domain — creates record if not exists, updates if does
+    const result = await users.findOneAndUpdate(
+      { 'shopify.shop': cleanShop },
+      {
+        $set: {
+          'shopify.shop': cleanShop,
+          'shopify.accessToken': accessToken,
+          'shopify.shopName': shopInfo.name,
+          'shopify.shopEmail': shopInfo.email,
+          'shopify.currency': shopInfo.currency,
+          'shopify.plan': shopInfo.plan_name,
+          'shopify.connectedAt': new Date()
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
 
-    let updateResult;
-    if (userId) {
-      // Best case: match by user ID
-      const { ObjectId } = require('mongodb');
-      updateResult = await users.findOneAndUpdate(
-        { _id: new ObjectId(userId) },
-        {
-          $set: {
-            'shopify.shop': shop,
-            'shopify.accessToken': accessToken,
-            'shopify.shopName': shopInfo.name,
-            'shopify.shopEmail': shopInfo.email,
-            'shopify.currency': shopInfo.currency,
-            'shopify.connectedAt': new Date()
-          }
-        },
-        { returnDocument: 'after' }
-      );
-    } else {
-      // Fallback: update by existing shop domain or most recent user
-      updateResult = await users.findOneAndUpdate(
-        { $or: [{ 'shopify.shop': shop }, { 'shopify.shop': { $exists: false } }] },
-        {
-          $set: {
-            'shopify.shop': shop,
-            'shopify.accessToken': accessToken,
-            'shopify.shopName': shopInfo.name,
-            'shopify.shopEmail': shopInfo.email,
-            'shopify.currency': shopInfo.currency,
-            'shopify.connectedAt': new Date()
-          }
-        },
-        { sort: { createdAt: -1 }, returnDocument: 'after' }
-      );
-    }
+    console.log('Shopify connected for shop:', cleanShop);
 
-    if (!updateResult) {
-      console.error('No user found to update with Shopify data');
-    }
+    // 4. Register webhooks (best-effort, non-blocking)
+    const webhooks = ['orders/create', 'orders/cancelled', 'orders/fulfilled', 'inventory_levels/update'];
+    const webhookAddr = `${DASHBOARD_URL}/.netlify/functions/automation`;
 
-    // Register webhooks (non-blocking)
-    const webhookBaseUrl = process.env.WEBHOOK_URL || `${DASHBOARD_URL}/.netlify/functions`;
-    const topics = [
-      'orders/create',
-      'orders/cancelled',
-      'orders/fulfilled',
-      'checkouts/create',
-      'inventory_levels/update'
-    ];
-
-    for (const topic of topics) {
+    for (const topic of webhooks) {
       try {
         await axios.post(
-          `https://${shop}/admin/api/2024-01/webhooks.json`,
-          { webhook: { topic, address: `${webhookBaseUrl}/webhooks`, format: 'json' } },
+          `https://${cleanShop}/admin/api/2024-01/webhooks.json`,
+          { webhook: { topic, address: webhookAddr, format: 'json' } },
           { headers: { 'X-Shopify-Access-Token': accessToken } }
         );
-        console.log(`Webhook registered: ${topic}`);
+        console.log('Webhook registered:', topic);
       } catch (e) {
-        console.log(`Webhook ${topic} already exists or failed:`, e.response?.data?.errors || e.message);
+        console.log('Webhook skip (may exist):', topic);
       }
     }
 
-    return {
-      statusCode: 302,
-      headers: { Location: `${DASHBOARD_URL}?shopify=connected&shop=${encodeURIComponent(shopInfo.name)}` },
-      body: ''
-    };
+    return redirect(`${DASHBOARD_URL}?shopify=connected&shop=${encodeURIComponent(shopInfo.name)}`);
 
   } catch (err) {
-    console.error('Shopify callback error:', err.response?.data || err.message);
-    const DASHBOARD_URL = process.env.FRONTEND_URL ||
-      (event.headers && event.headers.host ? `https://${event.headers.host}` : 'https://seller-autopilot-app.netlify.app');
-    return {
-      statusCode: 302,
-      headers: { Location: `${DASHBOARD_URL}?shopify=error&reason=server_error` },
-      body: ''
-    };
+    console.error('shopify-callback error:', err.response?.data || err.message);
+    return redirect(`${DASHBOARD_URL}?shopify=error&reason=server_error`);
   } finally {
-    if (client) await client.close();
+    if (client) {
+      try { await client.close(); } catch (_) {}
+    }
   }
 };
+
+function redirect(url) {
+  return { statusCode: 302, headers: { Location: url }, body: '' };
+}
