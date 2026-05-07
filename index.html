@@ -1784,57 +1784,49 @@
     window.location.href = `${siteUrl}/.netlify/identity/authorize?provider=google&redirect_to=${siteUrl}`;
   }
   async function connectShopify() {
-    // Get shop URL from user
+    // Prompt for store URL only — no login token required
     let shop = prompt('Enter your Shopify store URL:\n(example: mystore.myshopify.com)');
     if (!shop) return;
 
-    // Clean up input
-    shop = shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Clean input
+    shop = shop.trim().toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
 
-    // Validate format
-    if (!shop.endsWith('.myshopify.com')) {
-      if (!shop.includes('.')) {
-        shop = shop + '.myshopify.com';
-      } else {
-        return alert('Invalid store URL. Please use format: mystore.myshopify.com');
-      }
+    // Auto-append .myshopify.com if missing
+    if (!shop.includes('.')) {
+      shop = shop + '.myshopify.com';
+    } else if (!shop.endsWith('.myshopify.com')) {
+      return alert('Invalid store URL.\nPlease use format: yourstore.myshopify.com');
     }
 
-    const token = getToken();
-    if (!token) return alert('Please login first to connect Shopify.');
-
-    // Show loading state
-    const btn = document.querySelector('[onclick="connectShopify()"]') ||
-                document.querySelector('button[data-action="shopify"]');
-    if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
+    // Show loading on button
+    const btn = event && event.target ? event.target : document.querySelector('[onclick*="connectShopify"]');
+    const originalText = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = '⏳ Connecting...'; btn.disabled = true; }
 
     try {
       const res = await fetch(`/.netlify/functions/shopify-connect?shop=${encodeURIComponent(shop)}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        method: 'GET'
       });
 
+      let data;
+      try { data = await res.json(); } catch (e) { throw new Error('Invalid server response'); }
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Server error (${res.status})`);
+        throw new Error(data.error || `Server error (${res.status})`);
       }
 
-      const data = await res.json();
-
       if (data.url) {
-        // Redirect to Shopify OAuth
         window.location.href = data.url;
       } else {
-        throw new Error(data.error || 'Could not generate Shopify auth URL');
+        throw new Error(data.error || 'No redirect URL returned');
       }
 
     } catch (err) {
       console.error('Shopify connect error:', err);
-      alert('Connection failed: ' + err.message + '\n\nPlease try again.');
-      if (btn) { btn.textContent = 'Connect Shopify'; btn.disabled = false; }
+      alert('❌ Connection failed:\n' + err.message + '\n\nPlease try again.');
+      if (btn) { btn.textContent = originalText; btn.disabled = false; }
     }
   }
 
