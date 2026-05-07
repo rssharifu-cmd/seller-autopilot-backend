@@ -6,7 +6,8 @@ exports.handler = async (event) => {
   let client;
   try {
     const { shop, code, state } = event.queryStringParameters || {};
-    const DASHBOARD_URL = process.env.FRONTEND_URL || 'https://seller-autopilot-app.netlify.app';
+    const DASHBOARD_URL = process.env.FRONTEND_URL ||
+      (event.headers && event.headers.host ? `https://${event.headers.host}` : 'https://seller-autopilot-app.netlify.app');
 
     if (!shop || !code || !state) {
       return {
@@ -140,7 +141,8 @@ exports.handler = async (event) => {
 
   } catch (err) {
     console.error('Shopify callback error:', err.response?.data || err.message);
-    const DASHBOARD_URL = process.env.FRONTEND_URL || 'https://seller-autopilot-app.netlify.app';
+    const DASHBOARD_URL = process.env.FRONTEND_URL ||
+      (event.headers && event.headers.host ? `https://${event.headers.host}` : 'https://seller-autopilot-app.netlify.app');
     return {
       statusCode: 302,
       headers: { Location: `${DASHBOARD_URL}?shopify=error&reason=server_error` },
