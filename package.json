@@ -1,13 +1,22 @@
 {
-  "name": "seller-autopilot",
+  "name": "shopify-automation-app",
   "version": "1.0.0",
+  "description": "Shopify webhook automation — Abandoned Checkout, Welcome Emails, Low Stock Alerts",
+  "type": "module",
   "scripts": {
-    "build": "echo 'Build complete'"
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "test:webhook": "node scripts/test-webhook.js"
   },
   "dependencies": {
-    "mongodb": "^6.0.0",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "axios": "^1.7.9"
+    "@google/generative-ai": "^0.21.0",
+    "mongodb": "^6.13.0",
+    "resend": "^4.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^39.0.0"
+  },
+  "engines": {
+    "node": ">=20.x"
   }
 }

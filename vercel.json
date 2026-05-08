@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "shopify-automation-app",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": null,
+  "functions": {
+    "api/webhook.js": {
+      "maxDuration": 30,
+      "memory": 512
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/webhook",
+      "dest": "/api/webhook.js",
+      "methods": ["POST"]
+    }
+  ],
+  "env": {
+    "GEMINI_API_KEY": "@gemini_api_key",
+    "RESEND_API_KEY": "@resend_api_key",
+    "MONGODB_URI": "@mongodb_uri",
+    "MONGODB_DB_NAME": "@mongodb_db_name",
+    "SHOPIFY_WEBHOOK_SECRET": "@shopify_webhook_secret",
+    "SHOPIFY_STORE_DOMAIN": "@shopify_store_domain",
+    "FROM_EMAIL": "@from_email",
+    "STORE_OWNER_EMAIL": "@store_owner_email",
+    "STORE_NAME": "@store_name",
+    "LOW_STOCK_THRESHOLD": "@low_stock_threshold"
+  }
+}
