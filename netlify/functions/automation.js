@@ -1,69 +1,87 @@
 const { MongoClient } = require('mongodb');
 const axios = require('axios');
-const jwt = require('jsonwebtoken');
 
 exports.handler = async (event) => {
   try {
-    const { shop, code } = event.queryStringParameters || {};
+    const body = JSON.parse(event.body || '{}');
+    const topic = event.headers['x-shopify-topic'] || '';
+    const shop = event.headers['x-shopify-shop-domain'] || '';
 
-    if (!shop || !code) {
-      return { statusCode: 302, headers: { Location: 'https://seller-autopilot-app.netlify.app/?shopify=error&reason=missing_params' }, body: '' };
+    console.log('Webhook received:', topic, 'from:', shop);
+
+    if (!topic) {
+      return { statusCode: 200, body: 'OK' };
     }
 
-    // Exchange code for access token
-    const tokenRes = await axios.post(`https://${shop}/admin/oauth/access_token`, {
-      client_id: process.env.SHOPIFY_API_KEY,
-      client_secret: process.env.SHOPIFY_API_SECRET,
-      code
-    });
-
-    const accessToken = tokenRes.data.access_token;
-
-    // Save to MongoDB
+    // Get shop access token from MongoDB
     const client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    const users = client.db('seller-autopilot').collection('users');
-
-    // Update most recent user without shopify connected
-    await users.findOneAndUpdate(
-      { 'shopify.shop': { $exists: false } },
-      {
-        $set: {
-          'shopify.shop': shop,
-          'shopify.accessToken': accessToken,
-          'shopify.connectedAt': new Date()
-        }
-      },
-      { sort: { createdAt: -1 } }
-    );
-
+    const db = client.db('seller-autopilot');
+    const shopData = await db.collection('shops').findOne({ shop });
     await client.close();
 
-    // Register webhooks
-    const webhookUrl = 'https://seller-autopilot-app.netlify.app/.netlify/functions/automation';
-    const topics = ['orders/create', 'orders/cancelled', 'checkouts/create', 'inventory_levels/update'];
+    const customerEmail = body.email || body.customer?.email || '';
+    const customerName = body.customer?.first_name || 'there';
+    const orderNumber = body.order_number || body.name || '';
+    const totalPrice = body.total_price || '0';
 
-    for (const topic of topics) {
-      try {
-        await axios.post(
-          `https://${shop}/admin/api/2024-01/webhooks.json`,
-          { webhook: { topic, address: webhookUrl, format: 'json' } },
-          { headers: { 'X-Shopify-Access-Token': accessToken } }
-        );
-      } catch (e) { /* webhook may already exist */ }
+    let emailContent = '';
+    let subject = '';
+
+    if (topic === 'orders/create' || topic === 'orders/paid') {
+      subject = `Thank you for your order! 🎉`;
+      emailContent = `
+        <h2>Hi ${customerName}!</h2>
+        <p>Thank you for your order ${orderNumber ? '#' + orderNumber : ''}.</p>
+        <p>Your order of <strong>$${totalPrice}</strong> has been received and is being processed.</p>
+        <p>We'll notify you when it ships!</p>
+        <br>
+        <p>Thanks for shopping with us! 🛍️</p>
+      `;
+    } else if (topic === 'checkouts/create') {
+      subject = `You left something behind! 🛒`;
+      emailContent = `
+        <h2>Hi ${customerName}!</h2>
+        <p>You left some items in your cart.</p>
+        <p>Come back and complete your purchase!</p>
+        <a href="${body.abandoned_checkout_url || '#'}" style="background:#6366f1;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Complete Purchase</a>
+      `;
+    } else if (topic === 'inventory_levels/update') {
+      console.log('Inventory update:', body);
+      return { statusCode: 200, body: 'Inventory logged' };
     }
 
-    return {
-      statusCode: 302,
-      headers: { Location: 'https://seller-autopilot-app.netlify.app/?shopify=connected' },
-      body: ''
-    };
+    // Send email via Resend
+    if (customerEmail && emailContent) {
+      const resendResponse = await axios.post('https://api.resend.com/emails', {
+        from: 'onboarding@resend.dev',
+        to: customerEmail,
+        subject: subject,
+        html: emailContent
+      }, {
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Email sent:', resendResponse.data);
+
+      // Update stats in MongoDB
+      const statsClient = new MongoClient(process.env.MONGODB_URI);
+      await statsClient.connect();
+      const statsDb = statsClient.db('seller-autopilot');
+      await statsDb.collection('shops').updateOne(
+        { shop },
+        { $inc: { emailsSent: 1 } }
+      );
+      await statsClient.close();
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+
   } catch (err) {
-    console.error('Shopify callback error:', err.message);
-    return {
-      statusCode: 302,
-      headers: { Location: `https://seller-autopilot-app.netlify.app/?shopify=error&reason=${encodeURIComponent(err.message)}` },
-      body: ''
-    };
+    console.error('Automation error:', err.message);
+    return { statusCode: 200, body: JSON.stringify({ error: err.message }) };
   }
 };
