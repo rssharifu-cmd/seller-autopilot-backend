@@ -1,36 +1,82 @@
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient } = require('mongodb');
 const jwt = require('jsonwebtoken');
 
+const MONGODB_URI = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
+
 exports.handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
   try {
+    // Get token from header
+    const authHeader = event.headers.authorization || event.headers.Authorization || '';
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    if (!token) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'No token provided' })
+      };
+    }
+
     // Verify token
-    const token = event.headers.authorization?.replace('Bearer ', '');
-    if (!token) return { statusCode: 401, body: JSON.stringify({ error: 'Not authenticated' }) };
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtErr) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Session expired. Please login again.' })
+      };
+    }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const client = new MongoClient(process.env.MONGODB_URI);
+    // Get user from MongoDB
+    const client = new MongoClient(MONGODB_URI);
     await client.connect();
-    const users = client.db('seller-autopilot').collection('users');
-
-    const user = await users.findOne({ _id: new ObjectId(decoded.id) });
+    const db = client.db('seller-autopilot');
+    const user = await db.collection('users').findOne({ email: decoded.email });
     await client.close();
 
-    if (!user) return { statusCode: 404, body: JSON.stringify({ error: 'User not found' }) };
+    if (!user) {
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ error: 'User not found' })
+      };
+    }
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         name: user.name,
         email: user.email,
-        subscription: user.subscription,
-        automations: user.automations,
-        stats: user.stats,
-        shopify: user.shopify || null
+        shopDomain: user.shopDomain || null,
+        automations: user.automations || {},
+        stats: {
+          emailsSent: user.stats?.emailsSent || 0,
+          revenueRecovered: user.stats?.revenueRecovered || 0,
+          reviewsHandled: user.stats?.reviewsHandled || 0,
+          totalOrders: user.stats?.totalOrders || 0
+        }
       })
     };
-  } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: error.message })
+    };
   }
 };
