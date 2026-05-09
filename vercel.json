@@ -1,21 +1,15 @@
 {
   "version": 2,
-  "name": "shopify-automation-app",
   "builds": [
     {
-      "src": "server.js",
+      "src": "server.cjs",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/webhook",
-      "dest": "api/webhook.js",
-      "methods": ["POST"]
-    },
-    {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "server.cjs"
     }
   ]
 }
