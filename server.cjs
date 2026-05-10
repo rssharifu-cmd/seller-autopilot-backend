@@ -6,9 +6,7 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-// routes
 const authRoutes = require('./routes/auth');
-const shopifyRoutes = require('./routes/shopify');
 
 const app = express();
 
@@ -17,32 +15,29 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ডাটাবেজ কানেকশন
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('DB Connection Error:', err));
+// ডাটাবেজ কানেকশন স্ট্রিং ক্লিন করা
+const dbURI = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim().replace(/^["'](.+)["']$/, '$1') : "";
 
-// এপিআই রাউটস
+if (dbURI) {
+  mongoose.connect(dbURI)
+    .then(() => console.log('MongoDB connected ✅'))
+    .catch(err => console.error('DB Connection Error ❌:', err.message));
+} else {
+  console.error('CRITICAL: MONGODB_URI is missing or empty!');
+}
+
+// Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/shopify', shopifyRoutes);
 
-// Google Login Mock API (Firebase/Google SDK-র জন্য)
-app.post('/api/auth/google', async (req, res) => {
-  try {
-    const { email, name, googleId } = req.body;
-    // এখানে ইউজার ডাটাবেজে চেক/সেভ করার লজিক থাকবে
-    res.json({ success: true, message: "Google login successful", user: { email, name } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Google login failed" });
-  }
-});
-
-// হেলথ চেক
 app.get('/api/status', (req, res) => {
-  res.json({ status: "Seller Autopilot API running ✅", version: "1.1.0" });
+  res.json({ 
+    status: "API running", 
+    db: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    env_check: dbURI ? "URI Found" : "URI Missing"
+  });
 });
 
-// ফ্রন্টএন্ড পরিবেশন
+// Serve static index.html for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
