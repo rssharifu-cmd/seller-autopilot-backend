@@ -1,7 +1,7 @@
 {
   "name": "seller-autopilot-backend",
   "version": "1.0.0",
-  "description": "Shopify AI Automation with Gemini",
+  "description": "Shopify AI Automation with Gemini and Stripe",
   "main": "server.cjs",
   "engines": {
     "node": "20.x"
@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.13.0",
     "mongoose": "^8.0.0",
-    "resend": "^4.0.0"
+    "resend": "^4.0.0",
+    "stripe": "^14.25.0"
   }
 }
