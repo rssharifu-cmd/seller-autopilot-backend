@@ -26,13 +26,23 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/api/auth', authRoutes);
 app.use('/api/shopify', shopifyRoutes);
 
-// হেলথ চেক এপিআই
-app.get('/api/status', (req, res) => {
-  res.json({ status: "Seller Autopilot API running ✅", version: "1.0.0" });
+// Google Login Mock API (Firebase/Google SDK-র জন্য)
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { email, name, googleId } = req.body;
+    // এখানে ইউজার ডাটাবেজে চেক/সেভ করার লজিক থাকবে
+    res.json({ success: true, message: "Google login successful", user: { email, name } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Google login failed" });
+  }
 });
 
-// --- ফ্রন্টএন্ড কানেকশন (নতুন অংশ) ---
-// এটি index.html ফাইলটি লোড করবে যাতে ফ্রন্টএন্ড দেখা যায়
+// হেলথ চেক
+app.get('/api/status', (req, res) => {
+  res.json({ status: "Seller Autopilot API running ✅", version: "1.1.0" });
+});
+
+// ফ্রন্টএন্ড পরিবেশন
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
