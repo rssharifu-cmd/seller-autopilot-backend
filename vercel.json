@@ -2,14 +2,6 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/auth/login",
-      "destination": "/api/auth/login.js"
-    },
-    {
-      "source": "/api/auth/register",
-      "destination": "/api/auth/register.js"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
