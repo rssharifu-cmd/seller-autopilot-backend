@@ -1,19 +1,17 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "server.cjs",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "server.cjs"
+      "source": "/api/auth/login",
+      "destination": "/api/auth/login.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "server.cjs"
+      "source": "/api/auth/register",
+      "destination": "/api/auth/register.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
