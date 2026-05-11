@@ -167,3 +167,19 @@
 
 </body>
 </html>
+if (res.ok) {
+        alert(isLogin ? "Login Successful!" : "Registration Successful!");
+        
+        // ১. সাকসেস হলে ফর্ম বা মডাল বন্ধ করে দে
+        closeModal(); 
+
+        // ২. ইউজারের ডাটা লোকাল স্টোরেজে সেভ করে রাখ (পরে কাজে লাগবে)
+        localStorage.setItem('user', JSON.stringify(data));
+
+        // ৩. পেজ রিফ্রেশ কর অথবা ড্যাশবোর্ড দেখাও
+        // বর্তমানে তোর কোনো আলাদা ড্যাশবোর্ড পেজ নেই, তাই নিচের লাইনটি পেজ রিফ্রেশ করবে
+        window.location.reload(); 
+        
+        // যদি অন্য কোনো পেজে পাঠাতে চাস তবে এভাবে দিতি:
+        // window.location.href = '/dashboard.html';
+      }
