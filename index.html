@@ -64,15 +64,15 @@
 <nav>
   <div class="logo">Seller Autopilot</div>
   <div id="nav-auth">
-    <button class="btn-login" onclick="showModal('login')">Log In</button>
-    <button class="btn-primary" style="padding: 10px 20px;" onclick="showModal('signup')">Sign Up</button>
+    <button type="button" class="btn-login" onclick="showModal('login')">Log In</button>
+    <button type="button" class="btn-primary" style="padding: 10px 20px;" onclick="showModal('signup')">Sign Up</button>
   </div>
 </nav>
 
 <section class="hero">
   <h1>Your store runs<br><span>itself.</span></h1>
   <p style="color:var(--text-muted); max-width: 500px; margin-bottom: 40px;">AI automations for Shopify sellers. Plug and play.</p>
-  <button class="btn-primary" onclick="showModal('signup')">Start Free Trial</button>
+  <button type="button" class="btn-primary" onclick="showModal('signup')">Start Free Trial</button>
 </section>
 
 <div class="modal-overlay" id="modal-overlay">
@@ -100,7 +100,7 @@
 
     <div class="divider">OR</div>
 
-    <button class="btn-google" onclick="loginWithGoogle()">
+    <button type="button" class="btn-google" onclick="loginWithGoogle()">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
       Continue with Google
     </button>
@@ -114,14 +114,28 @@
 <script>
   let isLogin = false;
 
-  window.onload = () => {
-    const user = localStorage.getItem('user');
-    // Same index.html is served for `/dashboard`; redirecting while already there
-    // reloads the document repeatedly (looks like hammering in server logs).
-    if (user && window.location.pathname !== '/dashboard') {
+  function runSessionRouting() {
+    const path = window.location.pathname;
+    const token = localStorage.getItem('token');
+
+    if (path === '/dashboard') {
+      if (!token) {
+        localStorage.removeItem('user');
+        window.location.replace('/');
+      }
+      return;
+    }
+
+    if (token && path !== '/dashboard') {
       window.location.replace('/dashboard');
     }
-  };
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    queueMicrotask(() => {
+      requestAnimationFrame(runSessionRouting);
+    });
+  });
 
   function showModal(mode) {
     document.getElementById('modal-overlay').classList.add('active');
@@ -177,10 +191,20 @@
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('user', JSON.stringify(data));
         if (isLogin) {
+          if (!data.token) {
+            errorMsg.innerText = 'Login succeeded but no authentication token was returned.';
+            errorMsg.classList.add('show');
+            btn.disabled = false;
+            btn.innerText = 'Log In';
+            return;
+          }
+          localStorage.setItem('token', data.token);
+          const { token: _t, ...sessionWithoutToken } = data;
+          localStorage.setItem('user', JSON.stringify(sessionWithoutToken));
           window.location.replace('/dashboard');
         } else {
+          localStorage.setItem('user', JSON.stringify(data));
           closeModal();
           showModal('login');
           document.getElementById('modal-sub').innerText = "Account created! Please log in.";

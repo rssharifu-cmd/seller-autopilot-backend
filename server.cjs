@@ -10,39 +10,53 @@ const authRoutes = require('./routes/auth');
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ডাটাবেজ কানেকশন স্ট্রিং ক্লিন করা
-const dbURI = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim().replace(/^["'](.+)["']$/, '$1') : "";
+const dbURI = process.env.MONGODB_URI
+  ? process.env.MONGODB_URI.trim().replace(/^["'](.+)["']$/, '$1')
+  : '';
+
+const isVercel = Boolean(process.env.VERCEL);
 
 if (dbURI) {
-  mongoose.connect(dbURI)
-    .then(() => console.log('MongoDB connected ✅'))
-    .catch(err => console.error('DB Connection Error ❌:', err.message));
+  mongoose
+    .connect(dbURI)
+    .then(() => {
+      if (!isVercel) {
+        console.log('[seller-autopilot] MongoDB connected');
+      }
+    })
+    .catch((err) => {
+      console.error('[seller-autopilot] MongoDB connection error:', err.message);
+    });
 } else {
-  console.error('CRITICAL: MONGODB_URI is missing or empty!');
+  console.error('[seller-autopilot] MONGODB_URI is not set');
 }
 
-// Routes
 app.use('/api/auth', authRoutes);
 
 app.get('/api/status', (req, res) => {
-  res.json({ 
-    status: "API running", 
-    db: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
-    env_check: dbURI ? "URI Found" : "URI Missing"
+  res.json({
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    configuration: dbURI ? 'mongodb_uri_present' : 'mongodb_uri_missing',
   });
 });
 
-// Serve static index.html for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const PORT = Number(process.env.PORT) || 3000;
+
+module.exports = app;
+
+// Vercel invokes serverless handlers per request; never call listen() there.
+// Local development: run with `node server.cjs`.
+if (!isVercel && require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`[seller-autopilot] HTTP server listening on port ${PORT}`);
+  });
+}
