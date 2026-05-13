@@ -116,8 +116,10 @@
 
   window.onload = () => {
     const user = localStorage.getItem('user');
-    if (user) {
-      window.location.href = '/dashboard';
+    // Same index.html is served for `/dashboard`; redirecting while already there
+    // reloads the document repeatedly (looks like hammering in server logs).
+    if (user && window.location.pathname !== '/dashboard') {
+      window.location.replace('/dashboard');
     }
   };
 
@@ -177,7 +179,7 @@
       if (res.ok) {
         localStorage.setItem('user', JSON.stringify(data));
         if (isLogin) {
-          window.location.href = '/dashboard';
+          window.location.replace('/dashboard');
         } else {
           closeModal();
           showModal('login');
